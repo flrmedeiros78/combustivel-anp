@@ -1,0 +1,7 @@
+*.csv
+*.zip
+data/
+*.parquet
+__pycache__/
+.venv/
+README_passos.md
