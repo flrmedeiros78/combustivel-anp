@@ -9,10 +9,9 @@ CSV da ANP (data/)  →  NiFi (limpa e padroniza)  →  data/saida/*.csv  →  I
 ## O que cada ferramenta faz
 
 | Ferramenta | Papel | Onde roda |
-|---|---|---|
-| **Docker** | Executa NiFi e Impala em "caixas" (containers) isoladas | Dentro do WSL (Ubuntu) |
-| **NiFi** | Lê o CSV original, aplica schema com nomes limpos e grava o CSV tratado em `data/saida` | Container `nifi` (porta 8443) |
-| **Impala** | Lê o CSV tratado e permite consultas SQL rápidas | Containers `impala-*` e `quickstart-hive-metastore` |
+| **Docker**         | Executa NiFi e Impala em "caixas" (containers) isoladas | Dentro do WSL (Ubuntu) |
+| **NiFi**           | Lê o CSV original, aplica schema com nomes limpos e grava o CSV tratado em `data/saida`| Container `nifi` (porta 8443) |
+| **Impala**         | Lê o CSV tratado e permite consultas SQL rápidas | Containers `impala-*` e `quickstart-hive-metastore` |
 | **Hive Metastore** | "Catálogo" que guarda nome e estrutura das tabelas | Container `quickstart-hive-metastore` |
 
 ## Estrutura de pastas
@@ -102,7 +101,7 @@ Passos:
 6. Pare o NiFi: `docker compose stop nifi`.
 
 ---
-
+# ##################################################################-- O QUE ESTÁ FALTANDO FAZER --##################################################################
 ## C. Ajustes pendentes e como finalizar
 
 **1. NiFi: gravar o arquivo com nome sem acento** (o Impala ignorou o arquivo `Preços...csv`)
@@ -112,7 +111,7 @@ Passos:
 - Enquanto não fizer isso, renomeie manualmente: `mv data/saida/Pre*.csv data/saida/precos_2026_01.csv`.
 
 **2. Impala: conferir a tabela raw**
-# ##################################################################-- O QUE ESTÁ FALTANDO FAZER --##################################################################
+
 ```sql
 REFRESH anp.preco_raw;
 SELECT COUNT(*) FROM anp.preco_raw;   -- esperado: 422418

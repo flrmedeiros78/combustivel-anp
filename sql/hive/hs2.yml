@@ -1,0 +1,24 @@
+services:
+  hiveserver2:
+    image: apache/hive:3.1.3
+    container_name: quickstart-hiveserver2
+    mem_limit: 1536m
+    environment:
+      SERVICE_NAME: hiveserver2
+      SERVICE_OPTS: "-Dhive.metastore.uris=thrift://quickstart-hive-metastore:9083"
+      IS_RESUME: "true"
+    ports:
+      - "127.0.0.1:10000:10000"
+      - "127.0.0.1:10002:10002"
+    volumes:
+      - impala-quickstart-warehouse:/user/hive/warehouse
+      - ../../data/saida:/data/saida:ro
+    networks:
+      - quickstart-network
+volumes:
+  impala-quickstart-warehouse:
+    external: true
+    name: impala_impala-quickstart-warehouse
+networks:
+  quickstart-network:
+    external: true

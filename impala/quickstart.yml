@@ -93,6 +93,7 @@ services:
       - JAVA_TOOL_OPTIONS="-Xmx1g"
     volumes:
       - ../data/saida:/data/saida:ro
+      - impala-quickstart-warehouse:/user/hive/warehouse
       - ./quickstart_conf:/opt/impala/conf:ro
     networks:
       - quickstart-network

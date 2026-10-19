@@ -6,4 +6,4 @@ __pycache__/
 .venv/
 README_passos.md
 impala-src/
-
+.env
