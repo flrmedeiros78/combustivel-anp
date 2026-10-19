@@ -1,162 +1,244 @@
-# Projeto combustivel-anp: NiFi → Impala
+# Pipeline ANP: NiFi → Impala → Hive
 
-Pipeline de estudo com dados abertos da ANP (preços de combustíveis, 1º semestre de 2026, ~422 mil linhas).
+Pipeline de estudo com dados abertos da ANP (preços de combustíveis, 1º semestre de 2026, ~422 mil linhas). 
 
+O NiFi limpa e padroniza o CSV, o Impala consulta em SQL (camadas raw e curated em Parquet) e o Hive lê o mesmo metastore. 
+Tudo roda em containers Docker no WSL.
+
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![NiFi](https://img.shields.io/badge/Apache%20NiFi-2.x-728E9B)
+![Impala](https://img.shields.io/badge/Apache%20Impala-SQL-F8A100)
+![Hive](https://img.shields.io/badge/Apache%20Hive-3.1.3-FDEE21?logoColor=black)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Poetry](https://img.shields.io/badge/Poetry-gerenciador-60A5FA?logo=poetry&logoColor=white)
+
+## O que o projeto faz
+
+- Lê o CSV original da ANP (`data/entrada/`) e aplica um schema com nomes de colunas limpos (NiFi).
+- Grava o CSV tratado em `data/saida/precos_2026_01.csv`, com delimitador `|`.
+- Expõe o arquivo como tabela externa `anp.preco_raw` (tudo texto) no Impala.
+- Cria a camada `anp.preco_curated` em **Parquet**, com tipos corretos (data, `DECIMAL`) e textos padronizados.
+- Roda consultas analíticas com window functions (`sql/analises.sql`).
+- Disponibiliza o HiveServer2 no mesmo Hive Metastore e uma análise em Python (`impyla` + pandas).
+
+## Stack
+
+| Camada            | Tecnologia                                                  |
+|-------------------|-------------------------------------------------------------|
+| Containers        | Docker e Docker Compose (WSL/Ubuntu)                        |
+| Ingestão e limpeza| Apache NiFi 2.x                                             |
+| Consulta SQL      | Apache Impala (quickstart oficial, ajustado)                |
+| Catálogo          | Hive Metastore                                              |
+| SQL via Hive      | HiveServer2 (`apache/hive:3.1.3`)                           |
+| Formato analítico | Parquet                                                     |
+| Análise           | Python 3.12, `impyla`, pandas                               |
+| Dependências      | Poetry (`pyproject.toml`, `poetry.lock`)                    |
+| Versionamento     | Git e GitHub                                                |
+
+## Arquitetura
+
+O projeto segue a **Arquitetura Medallion** (Bronze → Silver → Gold), com ingestão no NiFi e processamento ELT no Impala:
+
+```mermaid
+flowchart TD
+    SOURCE[("CSV da ANP<br/>data/entrada")]
+    NIFI["Apache NiFi<br/>limpa e padroniza"]
+
+    BRONZE["Bronze<br/>CSV tratado + anp.preco_raw<br/>(texto)"]
+    SILVER["Silver<br/>anp.preco_curated<br/>(Parquet, tipos corretos)"]
+    GOLD["Gold<br/>agregações e rankings<br/>(sql/analises.sql)"]
+
+    ANALYTICS["Consumo<br/>Impala SQL, Hive e Python"]
+
+    HMS[/"Hive Metastore<br/>catálogo de tabelas"/]
+    VOL[/"Volume Docker<br/>impala-quickstart-warehouse"/]
+
+    SOURCE -->|"ListFile, FetchFile"| NIFI
+    NIFI -->|"ConvertRecord, PutFile"| BRONZE
+    BRONZE -->|"CREATE TABLE AS SELECT"| SILVER
+    SILVER -->|"agregação"| GOLD
+    GOLD --> ANALYTICS
+    SILVER --> ANALYTICS
+
+    BRONZE -.-> HMS
+    SILVER -.-> HMS
+    SILVER -.-> VOL
 ```
-CSV da ANP (data/)  →  NiFi (limpa e padroniza)  →  data/saida/*.csv  →  Impala (consulta SQL)
-```
 
-## O que cada ferramenta faz
+| Camada | Onde | Conteúdo | Formato |
+|------------|--------------------------------------------------------------------------------------------------------------|------------------------------------|
+| **Bronze** | `data/saida/` e `anp.preco_raw` | Dados da ANP sem transformar de tipo (tudo texto), nomes de colunas limpos | CSV com `\|` / tabela externa      |
+| **Silver** | `anp.preco_curated`             | Data como `TIMESTAMP`, preço como `DECIMAL(10,2)`, textos padronizados     | Parquet                            |
+| **Gold**   | `sql/analises.sql`              | Preço médio por produto/estado, ranking de municípios, variação mensal     | Consultas (ou tabelas `anp.gold_*`)|
+|------------|--------------------------------------------------------------------------------------------------------------|------------------------------------|
 
-| Ferramenta | Papel | Onde roda |
-| **Docker**         | Executa NiFi e Impala em "caixas" (containers) isoladas | Dentro do WSL (Ubuntu) |
-| **NiFi**           | Lê o CSV original, aplica schema com nomes limpos e grava o CSV tratado em `data/saida`| Container `nifi` (porta 8443) |
-| **Impala**         | Lê o CSV tratado e permite consultas SQL rápidas | Containers `impala-*` e `quickstart-hive-metastore` |
-| **Hive Metastore** | "Catálogo" que guarda nome e estrutura das tabelas | Container `quickstart-hive-metastore` |
+| Serviço                       | Container                                  | Porta(s)                    |
+|-------------------------------|--------------------------------------------|-----------------------------|
+| NiFi                          | `nifi`                                     | `8443`                      |
+| Impala (coord + exec)         | `impala-impalad-1-1`                       | `21000`, `21050`, `25000`   |
+| Catalog / Statestore          | `impala-catalogd-1`/`impala-statestored-1` | `25020` / `25010`           |
+| Hive Metastore                | `quickstart-hive-metastore`                | interna                     |
+| HiveServer2                   | `quickstart-hiveserver2`                   | `10000`, `10002`            |
+|-------------------------------|--------------------------------------------|-----------------------------|
 
+O NiFi e o Impala não devem rodar juntos: no meu caso o pc tem ~7,4 GB de RAM (WSL com ~5 GB). 
+se o seu caso for o mesmo: Ligue o NiFi, gere o arquivo, desligue-o e use o Impala.
+
+### Fluxo do NiFi (grupo `ingestao_combustiveis`)
+   
+| Processador         | O que faz                                                                                                 |
+|---------------------|-----------------------------------------------------------------------------------------------------------|
+| **ListFile**        | Lista os CSVs em `/data/entrada` (guarda estado para não repetir arquivos)                                |
+| **FetchFile**       | Lê o conteúdo do arquivo listado                                                                          |
+| **ConvertRecord**   | CSVReader (schema com nomes limpos, separador `;`) e CSVRecordSetWriter (sem cabeçalho, delimitador `\|`) |
+| **UpdateAttribute** | Define `filename = precos_2026_01.csv` (nome sem acento)                                                  |
+| **PutFile**         | Grava em `/data/saida`                                                                                    |
+|---------------------|-----------------------------------------------------------------------------------------------------------|
 ## Estrutura de pastas
 
 ```
 combustivel-anp/
-├── docker-compose.yml     # sobe o NiFi
-├── impala/quickstart.yml  # sobe o Impala (copiado do repositório oficial e ajustado)
-├── data/                  # CSV original da ANP (fora do Git)
-│   └── saida/             # CSV tratado pelo NiFi (fora do Git)
-├── impala-src/            # download do repositório oficial (fora do Git, pode apagar)
-├── sql/  python/  docs/
+├── docker-compose.yml      # sobe o NiFi
+├── impala/
+│   ├── quickstart.yml      # Impala (repositório oficial, ajustado)
+│   └── quickstart_conf/
+├── sql/
+│   ├── analises.sql        # consultas analíticas
+│   └── hive/hs2.yml        # HiveServer2
+├── python/                 # análise com impyla
+├── docs/                   # decisões e aprendizados
+├── pyproject.toml / poetry.lock
+├── .env                    # credenciais (fora do Git)
+└── data/                   # fora do Git
+    ├── entrada/            # CSV original da ANP
+    ├── saida/              # CSV tratado pelo NiFi
+    └── backup/
 ```
 
-Ajustes feitos no `impala/quickstart.yml`: `mem_limit` de 4 GB para 2 GB (o WSL tem ~5 GB) e 
-a pasta `../data/saida` montada em `/data/saida` nos serviços `hms`, `catalogd` e `impalad-1`.
+Ajustes no `impala/quickstart.yml`: `mem_limit` de 4 GB para 2 GB; 
+`../data/saida` montada em `/data/saida` no `hms`, `catalogd` e 
+`impalad-1`; volume `impala-quickstart-warehouse` também montado no `impalad-1`.
 
----
+## Como executar
 
-## A. Iniciar tudo depois de ligar o PC
-
-Rode no **Ubuntu (WSL)**. O Docker não inicia sozinho no WSL.
-
-**1. Iniciar o Docker**
+Pré-requisitos: Docker e Docker Compose no WSL (Ubuntu), Poetry e Python 3.12.
 
 ```bash
+git clone https://github.com/flrmedeiros78/combustivel-anp.git
+cd combustivel-anp
+cp .env.example .env     # defina NIFI_PASSWORD (12+ caracteres)
+poetry install
 sudo service docker start
 ```
 
-**2. Ir para o projeto**
-
-```bash
-cd ~/Projetos/combustivel-anp
-```
-
-**3. Subir o Impala**
+**Subir o Impala**
 
 ```bash
 export QUICKSTART_LISTEN_ADDR=127.0.0.1
 export IMPALA_QUICKSTART_IMAGE_PREFIX="apache/impala:81d5377c2-"
 docker compose -f impala/quickstart.yml up -d
-```
-
-As variáveis valem só para o terminal atual: repita os `export` em cada terminal novo.
-Se der erro de rede inexistente: `docker network create -d bridge quickstart-network`.
-Confira com `docker ps` (4 containers `Up`).
-
-**4. Abrir o shell do Impala** (aguarde ~1 min)
-
-```bash
 docker run -it --rm --network=quickstart-network ${IMPALA_QUICKSTART_IMAGE_PREFIX}impala_quickstart_client impala-shell -i impala-impalad-1-1:21050
 ```
 
-As tabelas continuam lá: ficam no volume Docker `impala-quickstart-warehouse`.
-Dicas: `Ctrl+L` limpa a tela (`clear` não existe); cole comandos longos em **uma linha só**.
+Se der erro de rede: `docker network create -d bridge quickstart-network`.
 
-**5. Subir o NiFi (só quando precisar ingerir dados)**
-
-```bash
-docker compose up -d nifi
-```
-
-Aguarde ~2 min e abra `https://localhost:8443/nifi` (aceite o aviso do certificado).
-Usuário `admin`, senha `senhaNifi12345`. O fluxo salvo continua lá (volume `nifi_conf`).
-
-**Por quê não deixar os dois ligados:** o computador tem ~7,4 GB de RAM. NiFi e Impala juntos apertam a memória, então ligue o NiFi, gere o arquivo, desligue-o e use o Impala.
-
----
-
-## B. Rodar o fluxo do NiFi (gerar o CSV tratado)
-
-Fluxo: `ListFile → FetchFile → ConvertRecord → PutFile` (grupo `ingestao_combustiveis`).
-
-| Processador | O que faz |
-|---|---|
-| **ListFile** | Lista os CSVs em `/data` (guarda estado para não repetir arquivos) |
-| **FetchFile** | Lê o conteúdo do arquivo listado |
-| **ConvertRecord** | Usa o **CSVReader** (schema com nomes limpos, separador `;`) e o **CSVRecordSetWriter** (sem cabeçalho) |
-| **PutFile** | Grava o resultado em `/data/saida` |
-
-Passos:
-1. Entre no grupo `ingestao_combustiveis`.
-2. Botão direito no **ListFile** → **View state** → **Clear state** (senão ele acha que já processou).
-3. Clique no canvas vazio → **Play** (▶).
-4. Confira: `ls -lh data/saida` e `wc -l data/saida/*` (esperado: 422418 linhas).
-5. Clique no canvas vazio → **Stop**.
-6. Pare o NiFi: `docker compose stop nifi`.
-
----
-# ##################################################################-- O QUE ESTÁ FALTANDO FAZER --##################################################################
-## C. Ajustes pendentes e como finalizar
-
-**1. NiFi: gravar o arquivo com nome sem acento** (o Impala ignorou o arquivo `Preços...csv`)
-- Adicione um **UpdateAttribute** entre o ConvertRecord e o PutFile.
-- Clique no **+**, crie a propriedade `filename` com valor `precos_2026_01.csv`.
-- Reconecte: ConvertRecord → UpdateAttribute → PutFile (relação `success`).
-- Enquanto não fizer isso, renomeie manualmente: `mv data/saida/Pre*.csv data/saida/precos_2026_01.csv`.
-
-**2. Impala: conferir a tabela raw**
-
-```sql
-REFRESH anp.preco_raw;
-SELECT COUNT(*) FROM anp.preco_raw;   -- esperado: 422418
-```
-
-**3. Camada curated em Parquet (não testado ainda)**
-Tudo está como texto na raw. Na curated convertemos os tipos (data e preço) e gravamos em Parquet.
-
-```sql
-CREATE TABLE anp.preco_curated STORED AS PARQUET AS
-SELECT regiao_sigla, estado_sigla, municipio, revenda, trim(cnpj_revenda) AS cnpj_revenda,
-       produto, to_timestamp(data_coleta, 'dd/MM/yyyy') AS data_coleta,
-       CAST(regexp_replace(valor_venda, ',', '.') AS DECIMAL(10,2)) AS valor_venda,
-       unidade_medida, bandeira
-FROM anp.preco_raw;
-COMPUTE STATS anp.preco_curated;
-```
-
-**4. Próximas etapas do projeto**
-- Consultas analíticas (média por produto/estado, ranking de municípios, variação com window functions).
-- HiveServer2 apontando para o mesmo metastore.
-- Análise em Python (Poetry + `impyla`).
-- Documentar decisões e aprendizados em `docs/`.
-
----
-
-## D. Desligar com segurança
+**Subir o Hive e o NiFi (só quando precisar)**
 
 ```bash
-docker compose stop nifi
-docker compose -f impala/quickstart.yml stop
+docker compose -f sql/hive/hs2.yml up -d     # depois do Impala
+docker compose up -d nifi                    # https://localhost:8443/nifi
 ```
 
-**Cuidado:** `docker compose down -v` apaga os volumes (tabelas do Impala e fluxo do NiFi). Use apenas `stop` no dia a dia.
+**Gerar o CSV tratado:** 
+no grupo `ingestao_combustiveis`, ListFile → View state → Clear state, depois Play. 
+Confira com `wc -l data/saida/precos_2026_01.csv` (esperado: 422418). Pare o fluxo e o NiFi: `docker compose stop nifi`.
 
----
+**Desligar:** 
+`docker compose stop nifi`, 
+`docker compose -f sql/hive/hs2.yml stop`, 
+`docker compose -f impala/quickstart.yml stop`. 
+Evite `docker compose down -v`: pois ele apaga as tabelas do Impala e o fluxo do NiFi.
 
-## E. Problemas encontrados e por quê
+## Modelo de dados
 
-| Problema | Causa | Solução |
-|---|---|---|
-| `Cannot connect to the Docker daemon` | WSL sem systemd: o Docker não inicia sozinho | `sudo service docker start` |
-| Containers morriam/travavam | WSL limitado a ~3,6 GB | `.wslconfig` com `memory=5GB` e `swap=4GB`, depois `wsl --shutdown` |
-| Colunas vazias no CSV de saída | CSVReader com nomes de cabeçalho diferentes do schema | Schema Text + `Ignore CSV Header Column Names = true` |
-| GetFile relia o arquivo em loop e enchia o disco | Com `Keep Source File = true` ele não guarda estado | Trocar por ListFile + FetchFile |
-| `ParquetRecordSetWriter` ausente no NiFi | Módulo Parquet não vem na imagem 2.x | NiFi gera CSV; o Parquet é criado no Impala/Hive (ELT) |
-| Impala retornava 0 linhas | O `ç` no nome do arquivo (`Preços`) era ignorado | Renomear para `precos_2026_01.csv` |
-| Shell do Impala não conectava | Nome padrão do README (`docker_impalad-1_1`) difere do nosso | `impala-shell -i impala-impalad-1-1:21050` |
+```sql
+CREATE EXTERNAL TABLE anp.preco_raw (
+   regiao_sigla STRING 
+  ,estado_sigla STRING 
+  ,municipio STRING 
+  ,revenda STRING
+  ,cnpj_revenda STRING
+  ,nome_rua STRING
+  ,numero_rua STRING
+  ,complemento STRING
+  ,bairro STRING
+  ,cep STRING
+  ,produto STRING
+  ,data_coleta STRING
+  ,valor_venda STRING
+  ,valor_compra STRING 
+  ,unidade_medida STRING 
+  ,bandeira STRING
+  )
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
+STORED AS TEXTFILE LOCATION '/data/saida';
+```
+
+A `anp.preco_curated` (Parquet) converte `data_coleta` para `TIMESTAMP`, 
+`valor_venda` para `DECIMAL(10,2)` (`vlr_venda`) e padroniza os textos com `trim(UPPER(...))`. 
+O SQL completo está na seção "Camada curated" do guia em `docs/`.
+
+## Consultas analíticas
+
+Em [`sql/analises.sql`](sql/analises.sql): preço médio por produto e estado, top 3 municípios mais caros por estado (`RANK`) e variação mensal do preço médio (`LAG`).
+
+## Habilidades praticadas
+
+- Containers com Docker Compose, redes e volumes compartilhados entre serviços
+- Ingestão e limpeza de dados com NiFi (Record processors, estado, atributos)
+- Modelagem raw → curated (ELT) com Parquet no Impala
+- SQL analítico: window functions (`RANK`, `LAG`), CTEs e agregações
+- Hive Metastore compartilhado entre Impala e Hive
+- Python com Poetry, `impyla` e pandas
+- Git e GitHub
+
+## Desafios resolvidos durante o desenvolvimento
+
+| Problema                                            | Causa                                   | Solução                                                            |
+|-----------------------------------------------------|-----------------------------------------|--------------------------------------------------------------------|
+| `Cannot connect to the Docker daemon`               | WSL sem systemd                         | `sudo service docker start`                                        |
+| Containers morriam/travavam                         | WSL limitado a ~3,6 GB                  | `.wslconfig` com `memory=5GB` e `swap=4GB`, depois `wsl --shutdown`|
+| Colunas vazias no CSV de saída                      | Cabeçalho do CSV diferente do schema    | Schema Text + `Ignore CSV Header Column Names = true`              |
+| GetFile relia o arquivo em loop                     | Sem estado com `Keep Source File = true`| ListFile + FetchFile                                               |
+| `ParquetRecordSetWriter` ausente                    | Módulo Parquet não vem na imagem 2.x    | NiFi gera CSV; Parquet é criado no Impala (ELT)                    |
+| Impala retornava 0 linhas                           | `ç` no nome do arquivo                  | `UpdateAttribute` com `filename` sem acento                        |
+| Colunas deslocadas, `String to Decimal parse failed`| `;` dentro de `complemento`             | Delimitador `\|` no NiFi e na raw                                  |
+| `Mkdirs failed to create .../preco_curated`         | `impalad-1` sem o volume do warehouse   | Montar o volume no `impalad-1` e liberar permissão                 |
+| `Invalid parquet fallback schema resolution`        | Variável de sessão inválida             | `SET PARQUET_FALLBACK_SCHEMA_RESOLUTION=POSITION;`                 |
+| Login do NiFi recusado após trocar a senha          | Container não recriado                  | `docker compose up -d --force-recreate nifi`                       |
+|-----------------------------------------------------|-----------------------------------------|--------------------------------------------------------------------|
+
+## Próximos passos
+
+- [x] NiFi com `UpdateAttribute` (nome do arquivo sem acento)
+- [x] Camada curated em Parquet
+- [x] Consultas analíticas com window functions
+- [x] HiveServer2 no mesmo metastore
+- [x] Ambiente Python com Poetry e `impyla`
+- [x] Testar a leitura da `anp.preco_curated` (Parquet) pelo Hive
+- [ ] Documentar decisões e aprendizados em `docs/`
+- [ ] Criar `.env.example`
+- [ ] Materializar a camada Gold em tabelas `anp.gold_*` (CTAS a partir de `sql/analises.sql`)
+
+## Créditos 
+
+Projeto de estudo com dados abertos da ANP.
+Desenvolvido como parte do aprendizado contínuo e práticas modernas de Engenharia de Dados/Analise de dados.
+
+# Contato:
+Fabio Medeiros
+Engenharia de Dados/Analise de dados
+Email: fabiolrm78@gmail.com
+Telefone: (21) 99663-7177
+
+
