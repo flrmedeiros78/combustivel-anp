@@ -217,7 +217,7 @@ Em [`sql/analises.sql`](sql/analises.sql): preço médio por produto e estado, t
 | `Mkdirs failed to create .../preco_curated`         | `impalad-1` sem o volume do warehouse   | Montar o volume no `impalad-1` e liberar permissão                 |
 | `Invalid parquet fallback schema resolution`        | Variável de sessão inválida             | `SET PARQUET_FALLBACK_SCHEMA_RESOLUTION=POSITION;`                 |
 | Login do NiFi recusado após trocar a senha          | Container não recriado                  | `docker compose up -d --force-recreate nifi`                       |
-|-----------------------------------------------------|-----------------------------------------|--------------------------------------------------------------------|
+
 
 ## Próximos passos
 
