@@ -65,12 +65,12 @@ flowchart TD
     SILVER -.-> VOL
 ```
 
-| Camada | Onde | Conteúdo | Formato |
-|------------|--------------------------------------------------------------------------------------------------------------|------------------------------------|
+| Camada     | Onde                            | Conteúdo                                                                   | Formato                            |
+|------------|---------------------------------|----------------------------------------------------------------------------|------------------------------------|
 | **Bronze** | `data/saida/` e `anp.preco_raw` | Dados da ANP sem transformar de tipo (tudo texto), nomes de colunas limpos | CSV com `\|` / tabela externa      |
 | **Silver** | `anp.preco_curated`             | Data como `TIMESTAMP`, preço como `DECIMAL(10,2)`, textos padronizados     | Parquet                            |
 | **Gold**   | `sql/analises.sql`              | Preço médio por produto/estado, ranking de municípios, variação mensal     | Consultas (ou tabelas `anp.gold_*`)|
-|------------|--------------------------------------------------------------------------------------------------------------|------------------------------------|
+
 
 | Serviço                       | Container                                  | Porta(s)                    |
 |-------------------------------|--------------------------------------------|-----------------------------|
@@ -79,7 +79,7 @@ flowchart TD
 | Catalog / Statestore          | `impala-catalogd-1`/`impala-statestored-1` | `25020` / `25010`           |
 | Hive Metastore                | `quickstart-hive-metastore`                | interna                     |
 | HiveServer2                   | `quickstart-hiveserver2`                   | `10000`, `10002`            |
-|-------------------------------|--------------------------------------------|-----------------------------|
+
 
 O NiFi e o Impala não devem rodar juntos: no meu caso o pc tem ~7,4 GB de RAM (WSL com ~5 GB). 
 se o seu caso for o mesmo: Ligue o NiFi, gere o arquivo, desligue-o e use o Impala.
@@ -93,25 +93,26 @@ se o seu caso for o mesmo: Ligue o NiFi, gere o arquivo, desligue-o e use o Impa
 | **ConvertRecord**   | CSVReader (schema com nomes limpos, separador `;`) e CSVRecordSetWriter (sem cabeçalho, delimitador `\|`) |
 | **UpdateAttribute** | Define `filename = precos_2026_01.csv` (nome sem acento)                                                  |
 | **PutFile**         | Grava em `/data/saida`                                                                                    |
-|---------------------|-----------------------------------------------------------------------------------------------------------|
+
 ## Estrutura de pastas
 
 ```
 combustivel-anp/
-├── docker-compose.yml      # sobe o NiFi
+├── docker-compose.yml       # sobe o NiFi
 ├── impala/
-│   ├── quickstart.yml      # Impala (repositório oficial, ajustado)
+│   ├── quickstart.yml       # Impala (repositório oficial, ajustado)
 │   └── quickstart_conf/
 ├── sql/
-│   ├── analises.sql        # consultas analíticas
-│   └── hive/hs2.yml        # HiveServer2
-├── python/                 # análise com impyla
-├── docs/                   # decisões e aprendizados
+│   ├── analises.sql         # consultas analíticas
+│   └── hive/hs2.yml         # HiveServer2
+├── python/analise_precos.py # análise com impyla
+├── docs/                    # decisões e aprendizados
 ├── pyproject.toml / poetry.lock
-├── .env                    # credenciais (fora do Git)
-└── data/                   # fora do Git
-    ├── entrada/            # CSV original da ANP
-    ├── saida/              # CSV tratado pelo NiFi
+├── .env                     # credenciais (fora do Git)
+├── .env.example             # credenciais (dentro do Git)
+└── data/                    # fora do Git
+    ├── entrada/             # CSV original da ANP
+    ├── saida/               # CSV tratado pelo NiFi
     └── backup/
 ```
 
