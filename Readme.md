@@ -112,7 +112,7 @@ Se o seu caso for o mesmo, ligue o NiFi, gere o arquivo, desligue-o e use o Impa
 | **UpdateAttribute** | Define `filename = precos_2026_01.csv` (nome sem acento)                                                  |
 | **PutFile**         | Grava em `/data/saida`                                                                                    |
 
-## Estrutura de pastas
+## Estrutura de diretórios
 
 ```
 combustivel-anp/
@@ -127,7 +127,7 @@ combustivel-anp/
 │   ├── main.py                 # orquestra as consultas e os gráficos
 │   ├── db.py                   # conexão com o Impala e leitura dos .sql
 │   ├── graficos.py             # gráficos (matplotlib)
-│   └── config.py               # constantes (host, porta, pastas)
+│   └── config.py               # constantes (host, porta, folder)
 ├── docs/
 │   └── graficos/               # PNGs gerados pelo Python
 ├── pyproject.toml / poetry.lock
@@ -261,7 +261,7 @@ Gerados por `python/main.py` a partir das consultas acima:
 | Hive retornava `COUNT = 0`                           | Usava estatísticas do `COMPUTE STATS` do Impala        | `SET hive.compute.query.using.stats=false;`                          |
 | Hive via `/data/saida` vazia                         | Volume relativo é contado a partir do yml (`sql/hive`) | Usar `../../data/saida` e recriar com `--force-recreate`             |
 | `Connection refused` no Beeline logo após subir      | O HiveServer2 leva 1 a 2 min para abrir a porta        | Aguardar e conferir `docker logs quickstart-hiveserver2`             |
-| Gráficos dentro de `data/saida`                      | A pasta é a `LOCATION` da tabela raw                   | Salvar os PNGs em `docs/graficos/`                                   |
+| Gráficos dentro de `data/saida`                      | A folder é a `LOCATION` da tabela raw                   | Salvar os PNGs em `docs/graficos/`                                   |
 
 ## Próximos passos
 
