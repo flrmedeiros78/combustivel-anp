@@ -5,6 +5,9 @@ data/
 __pycache__/
 .venv/
 README_passos.md
+Readme_Guia_Sql.md
+Readme_Resp_Sql.md
 impala-src/
 .env
 .vscode
+*.png

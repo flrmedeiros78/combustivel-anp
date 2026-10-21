@@ -48,7 +48,7 @@ def grafico_f1(df: pd.DataFrame):
 #   └──────────────────┘       └──────────────────┘
 #     Preço Médio (R$)           Preço Médio (R$)   
 
-
+# F.2 - Top 3 Municípios Mais Caros por Estado (Gasolina)
 def grafico_f2(df: pd.DataFrame):
     fig, ax = plt.subplots(figsize=(12, 6))
     
