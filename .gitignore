@@ -14,3 +14,5 @@ impala-src/
 *.png
 .agents/
 .claude/
+!python/painel/dados_gold/
+!python/painel/dados_gold/*.csv
