@@ -11,3 +11,5 @@ impala-src/
 .env
 .vscode
 *.png
+.agents/
+.claude/

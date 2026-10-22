@@ -2,13 +2,15 @@ from pathlib import Path
 from db import executar_query
 from graficos import grafico_f1, grafico_f2, grafico_f3
 
-SQL_DIR = Path(__file__).parent.parent / "sql" / "impala"
-
+# python/graficos/grafico_f1.py
+#/home/flrm/Projetos/combustivel-anp/sql/impala/consultas/f1_preco_medio_estado.sql
+SQL_DIR = Path(__file__).parent.parent / "sql" / "impala" / "consultas"
+#/home/flrm/Projetos/combustivel-anp/sql/impala/consultas/f1_preco_medio_estado.sql
 def ler_sql(nome:str)-> str:
     return (SQL_DIR / nome).read_text(encoding="utf-8")
 
 def main():
-# F.1
+    # F.1
     df1 =  executar_query("f1_preco_medio_estado")
     grafico_f1(df1)
 
@@ -23,10 +25,3 @@ def main():
     
 if __name__ == "__main__":
     main()
-
-     
-     
-     
-
- 
-

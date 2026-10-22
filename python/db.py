@@ -1,5 +1,5 @@
 import pandas as pd
-from pathlib import Path
+# from pathlib import Path
 from impala.dbapi import connect
 from config import IMPALA_HOST, IMPALA_PORT, IMPALA_DB, SQL_DIR
 import warnings

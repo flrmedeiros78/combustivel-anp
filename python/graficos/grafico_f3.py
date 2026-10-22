@@ -13,7 +13,7 @@ def grafico_f3(df: pd.DataFrame):
         ax.plot(sub["mes"],
                 sub["preco_medio"],
                 marker="o",
-                color=CORES.get(produto, "#7f8c8d"),
+                color=CORES.get(produto.lower(), "#0a1afd"),
                 label=produto)
         
         ax.set_title(f"{produto} -  Preço Médio Mensal")

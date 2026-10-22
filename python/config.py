@@ -2,8 +2,8 @@ from pathlib import Path
 
 # config de diretorios
 BASE_DIR = Path(__file__).resolve().parent.parent
-SQL_DIR = BASE_DIR / "sql" / "impala"
-OUTPUT_DIR = BASE_DIR /"docs"/"graficos"
+SQL_DIR = BASE_DIR / "sql" / "impala" / "consultas"
+OUTPUT_DIR = BASE_DIR /"docs"/"graficos" 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Conexão com o Impala
@@ -12,8 +12,8 @@ IMPALA_PORT = 21050
 IMPALA_DB = "anp"
 
 CORES ={
-    "gasolina": "#580b03",
-    "etanol": "#27ae60",
-    "diesel": "#2980b9",
-    "GNV": "#b7f312",
+    "gasolina": "#8540A5",
+    "etanol": "#7088a3",
+    "diesel": "#63853cf6",
+    "gnv": "#f3a412",
 }

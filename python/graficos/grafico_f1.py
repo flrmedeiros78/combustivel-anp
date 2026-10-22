@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 # import matplotlib.dates as mdates
-from config import OUTPUT_DIR, CORES
+from config import OUTPUT_DIR , CORES
 
 # Graficos de preços por estado
 def grafico_f1(df: pd.DataFrame):
@@ -15,9 +15,19 @@ def grafico_f1(df: pd.DataFrame):
         sub = df[df["produto"] == produto].sort_values("preco_medio", ascending=False)
         
         #Desenha barras horizontais:
-        ax.barh(range(len(sub)),                          # posições verticais (0, 1, 2, ...)
-                sub["preco_medio"],                       # largura de cada barra
-                color=CORES.get(produto, "#2486e0"))    # cor específica do produto (com fallback cinza)
+        bars = ax.barh(range(len(sub)),                          # posições verticais (0, 1, 2, ...)
+                sub["preco_medio"],                             # largura de cada barra
+                color=CORES.get(produto.lower(), "#68BCE2"))    # cor do produto
+        
+        # infoma ao lado da barra o valor em real
+        ax.bar_label(bars, fmt="R$ %.2f", padding=3, fontsize=9)
+        
+        # # informar o valor em percentual
+        # max_val = sub["preco_medio"].max()
+        # pcts = [f"{(v / max_val * 100):.2f}%" 
+                # for v in sub["preco_medio"]]
+        # ax.bar_label(bars, labels=pcts, padding=3, fontsize=9)
+        
         ax.set_yticks(range(len(sub)))
         ax.set_yticklabels(sub["estado"])
         
