@@ -17,3 +17,4 @@ impala-src/
 .claude/
 !python/painel/dados_gold/
 !python/painel/dados_gold/*.csv
+!docs/img/*.png
