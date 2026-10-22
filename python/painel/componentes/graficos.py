@@ -42,7 +42,7 @@ def fig_preco_estado(df: pd.DataFrame, produto: str, uf: str | None = None) -> f
                       marker_opacity=[1 if not uf or e == uf else .3 for e in df["estado"]])  # destaca o estado clicado
     fig.update_yaxes(autorange="reversed", title=None)
     fig.update_xaxes(range=[df["preco_medio"].min() - 0.3, df["preco_medio"].max() + 0.25], title=None)
-    fig.update_layout(height=520, margin=dict(l=0, r=10, t=10, b=0), showlegend=False)
+    fig.update_layout(height=360, margin=dict(l=0, r=25, t=45, b=0), showlegend=False)
     return fig
 
 

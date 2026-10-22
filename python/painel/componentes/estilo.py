@@ -2,8 +2,8 @@ import streamlit as st
 from html import escape
 
 # Mesma paleta do HTML. Chave em maiúsculas, como vem da camada silver.
-CORES = {"GASOLINA": "#c2410c", "GASOLINA ADITIVADA": "#9a3412", "ETANOL": "#15803d",
-         "DIESEL": "#1d4ed8", "DIESEL S10": "#1e3a8a", "GNV": "#7c8f00"}
+CORES = {"GASOLINA": "#6ec0f0", "GASOLINA ADITIVADA": "#37566b", "ETANOL": "#ddda32",
+         "DIESEL": "#f0a720", "DIESEL S10": "#f0a720a4", "GNV": "#7c8f00"}
 
 
 def cor(produto: str) -> str:
