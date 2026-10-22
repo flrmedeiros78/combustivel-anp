@@ -1,4 +1,5 @@
-*.csv
+data/entrada/*.csv
+data/saida/*.csv
 *.zip
 data/
 *.parquet
