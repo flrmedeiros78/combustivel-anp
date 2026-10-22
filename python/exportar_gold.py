@@ -9,14 +9,15 @@ tabelas = ["gold_preco_medio_estado", "gold_top3_mun_caros", "gold_variacao_mens
 def main() -> None:
     destino.mkdir(exist_ok=True)
     conn = connect(host=IMPALA_HOST, port=IMPALA_PORT)
-    
-    for t in tabelas:
-        cur = conn.cursor()
-        cur. execute(f"SELECT * FROOM anp.{t}")
-        df = pd.DataFrame(cur.fetchall(), columns=[c[0] for c in cur.description])
-        df.to_csv(destino / f"{t}.csv", index=False)
-        print(f"[ok] {t}: {len(df)} Registros")
-    conn.close()
-    
+    try:
+        for t in tabelas:
+            cur = conn.cursor()
+            cur. execute(f"SELECT * FROM anp.{t}")
+            df = pd.DataFrame(cur.fetchall(), columns=[c[0] for c in cur.description])
+            df.to_csv(destino / f"{t}.csv", index=False)
+            print(f"[ok] {t}: {len(df)} Registros")
+        conn.close()
+    finally:
+        conn.close()
 if __name__ == "__main__":
     main()
